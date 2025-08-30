@@ -3,136 +3,170 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Valentine's Day Scene</title>
+    <title>Valentine's Day — Start & Message Screens</title>
     <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            background: #ffe6f1;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        canvas {
-            image-rendering: pixelated;
-            border: 4px solid #ff8fb6;
-            border-radius: 12px;
-            background: #fff7fb;
-            box-shadow: 0 16px 60px rgba(0,0,0,.3);
-        }
+        html, body { height: 100%; margin: 0; background: #ffe6f1; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+        #wrap { display:flex; align-items:center; justify-content:center; height:100%; }
+        canvas { image-rendering: pixelated; border: 4px solid #ff8fb6; border-radius: 14px; background: #fff7fb; box-shadow: 0 18px 70px rgba(0,0,0,.28); }
+
+        /* Overlays */
+        .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; }
+        .start-bg { background: radial-gradient(1200px 800px at 50% 30%, #fff7fb 0, #ffd8e8 55%, #ffc0d9 100%); }
+        .panel { background:#fff; padding:24px 22px; border-radius:18px; box-shadow:0 28px 90px rgba(0,0,0,.18); text-align:center; width:min(720px,92vw); border:3px solid #ffb3cc; }
+        h1 { margin:0 0 .25rem; font-size: 30px; color:#c2175a; letter-spacing:.3px }
+        p { margin:.35rem 0; color:#6b0832 }
+        .btn { background:#ff4d8d; color:#fff; border:0; border-radius:14px; padding:10px 14px; font-weight:800; box-shadow:0 12px 30px rgba(255, 77, 141, .55); cursor:pointer; margin: 6px; }
+        .btn:hover { filter: brightness(1.06) }
+
+        /* Prompt */
+        #prompt { position: fixed; left:50%; transform:translateX(-50%); bottom: 18px; background:#fff; color:#7b0f3d; border-radius:999px; padding:8px 14px; box-shadow:0 12px 30px rgba(0,0,0,.2); font-weight:800; display:none; }
     </style>
 </head>
 <body>
-<canvas id="game" width="960" height="540"></canvas>
+<div id="wrap">
+    <canvas id="game" width="960" height="540" aria-label="Valentine Game"></canvas>
+</div>
+<div id="prompt"></div>
+
+<!-- Start Screen (internal screen) -->
+<div id="start" class="overlay start-bg" style="display:flex">
+    <div class="panel">
+        <h1>For You, On Valentine’s Day 💘</h1>
+        <p>Move with arrow keys. Press <b>E</b> to interact.</p>
+        <p>Go to the <b>door</b> in the room → press <b>E</b>. Then find the <b>envelope</b> in the garden → press <b>E</b>.</p>
+        <p>
+            <button class="btn" id="btnStart">Start</button>
+            <button class="btn" id="btnHow">How to Play</button>
+        </p>
+    </div>
+</div>
+
+<!-- How-to overlay (also internal screen) -->
+<div id="how" class="overlay start-bg">
+    <div class="panel">
+        <h1>How to Play</h1>
+        <p>⬅️⬆️⬇️➡️ to move • <b>E</b> to interact</p>
+        <p>1) In the room, walk to the door and press <b>E</b>.</p>
+        <p>2) In the garden, walk to the envelope and press <b>E</b>.</p>
+        <p><button class="btn" id="btnCloseHow">Close</button></p>
+    </div>
+</div>
+
+<!-- Letter/message Screen (internal screen) -->
+<div id="letterScreen" class="overlay start-bg">
+    <div class="panel">
+        <h1>Happy Valentine’s Day, 愛你 ❤️</h1>
+        <p>Every day with you feels brighter, sweeter, and so full of meaning. You make the ordinary feel special, and the special unforgettable. I’m so grateful for your smile, your kindness, and the way you make my world better just by being in it. Today is just one day to celebrate you, but I hope you know I carry that love for you every single day. 💌.</p>
+        <p><button class="btn" id="btnCloseLetter">Close</button></p>
+    </div>
+</div>
 
 <script>
-    const canvas = document.getElementById("game");
-    const ctx = canvas.getContext("2d");
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const promptEl = document.getElementById('prompt');
 
-    const assets = {
-        room: "https://raw.githubusercontent.com/EXIBIST32132/ValentinesDay/main/IMG/Room.png",
-        garden: "https://raw.githubusercontent.com/EXIBIST32132/ValentinesDay/main/IMG/Garden.png",
-        girl: "https://raw.githubusercontent.com/EXIBIST32132/ValentinesDay/main/IMG/Girl.png"
+    // GitHub assets
+    const ASSETS = {
+        room:  'https://raw.githubusercontent.com/EXIBIST32132/ValentinesDay/main/IMG/Room.png',
+        garden:'https://raw.githubusercontent.com/EXIBIST32132/ValentinesDay/main/IMG/Garden.png',
+        girl:  'https://raw.githubusercontent.com/EXIBIST32132/ValentinesDay/main/IMG/Girl.png'
     };
 
-    const images = {};
-    let world = { scene: "room" };
-
-    function loadImage(name, url) {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => { images[name] = img; resolve(); };
-            img.onerror = reject;
-            img.src = url;
-        });
-    }
-
-    async function loadAssets() {
-        await Promise.all([
-            loadImage("room", assets.room),
-            loadImage("garden", assets.garden),
-            loadImage("girl", assets.girl)
-        ]);
-        draw();
-    }
-
-    const player = { x: 200, y: 350, w: 64, h: 64 };
+    const IMG = {};
+    const world = { scene: 'room', running:false };
     const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, e:false };
-    const letter = { x: 460, y: 280, w: 50, h: 30, opened: false };
 
-    function drawRoom() {
-        ctx.drawImage(images.room, 0, 0, canvas.width, canvas.height);
+    // Scale girl by 1.5 (64→96)
+    const player = { x: 180, y: 360, w: 96, h: 96, speed: 3 };
+
+    // Envelope (center garden)
+    const letter = { x: Math.round(W/2-28), y: Math.round(H*0.52-16), w: 56, h: 32, opened:false };
+
+    // Simple AABB
+    function aabb(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
+    function showPrompt(t){ promptEl.textContent=t; promptEl.style.display='block'; }
+    function hidePrompt(){ promptEl.style.display='none'; }
+
+    function loadImage(name, url){
+        return new Promise((resolve,reject)=>{ const img=new Image(); img.crossOrigin='anonymous'; img.onload=()=>{ IMG[name]=img; resolve(); }; img.onerror=()=>reject(new Error('load '+name)); img.src=url; });
     }
 
-    function drawGarden() {
-        ctx.drawImage(images.garden, 0, 0, canvas.width, canvas.height);
-        drawEnvelope(letter.x, letter.y, letter.w, letter.h);
+    async function loadAssets(){
+        await Promise.all([
+            loadImage('room', ASSETS.room),
+            loadImage('garden', ASSETS.garden),
+            loadImage('girl', ASSETS.girl),
+        ]);
     }
 
-    function drawPlayer() {
-        ctx.drawImage(images.girl, player.x, player.y, player.w, player.h);
-    }
-
-    function drawEnvelope(x,y,w,h) {
+    function drawEnvelope(x,y,w,h){
         ctx.save();
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(x,y,w,h);
-        ctx.strokeStyle = "#ff8fb6";
-        ctx.strokeRect(x,y,w,h);
-        ctx.beginPath();
-        ctx.moveTo(x,y);
-        ctx.lineTo(x+w/2,y+h/2);
-        ctx.lineTo(x+w,y);
-        ctx.stroke();
-        ctx.fillStyle = "#ff4d8d";
-        ctx.beginPath();
-        ctx.moveTo(x+w/2,y+h/2);
-        ctx.arc(x+w/2-4,y+h/2-4,4,0,Math.PI*2);
-        ctx.arc(x+w/2+4,y+h/2-4,4,0,Math.PI*2);
-        ctx.lineTo(x+w/2,y+h/2+6);
-        ctx.fill();
+        // shadow
+        ctx.globalAlpha=.22; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(x+w/2, y+h, w/2, 6, 0, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+        // body
+        ctx.fillStyle='#fff'; ctx.strokeStyle='#ff8fb6'; ctx.lineWidth=2; ctx.fillRect(x,y,w,h); ctx.strokeRect(x+1,y+1,w-2,h-2);
+        // flap
+        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+w/2,y+h/2); ctx.lineTo(x+w,y); ctx.stroke();
+        // heart seal
+        ctx.fillStyle='#ff4d8d'; ctx.beginPath(); ctx.moveTo(x+w/2, y+h/2); ctx.arc(x+w/2-4,y+h/2-3,3.6,0,Math.PI*2); ctx.arc(x+w/2+4,y+h/2-3,3.6,0,Math.PI*2); ctx.lineTo(x+w/2,y+h/2+6); ctx.fill();
         ctx.restore();
     }
 
-    function aabb(a,b){
-        return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+    function drawRoom(){ ctx.drawImage(IMG.room, 0, 0, W, H); }
+    function drawGarden(){ ctx.drawImage(IMG.garden, 0, 0, W, H); drawEnvelope(letter.x, letter.y, letter.w, letter.h); }
+
+    function drawPlayer(){
+        // shadow
+        ctx.globalAlpha=.22; ctx.fillStyle='#000'; ctx.beginPath(); ctx.ellipse(player.x+player.w/2, player.y+player.h-8, 18, 7, 0, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+        ctx.drawImage(IMG.girl, player.x, player.y, player.w, player.h);
     }
 
-    function update() {
-        const speed = 3;
-        if(keys.ArrowLeft) player.x -= speed;
-        if(keys.ArrowRight) player.x += speed;
-        if(keys.ArrowUp) player.y -= speed;
-        if(keys.ArrowDown) player.y += speed;
+    function update(){
+        const s = player.speed; let vx=0, vy=0;
+        if(keys.ArrowLeft)  vx=-s;
+        if(keys.ArrowRight) vx= s;
+        if(keys.ArrowUp)    vy=-s;
+        if(keys.ArrowDown)  vy= s;
+        player.x = Math.max(0, Math.min(W-player.w, player.x+vx));
+        player.y = Math.max(0, Math.min(H-player.h, player.y+vy));
 
-        if(world.scene === "room" && player.x > 860) {
-            world.scene = "garden";
-            player.x = 100; player.y = 400;
-        }
+        // Keep the classic flow: leave room when at right edge
+        if(world.scene==='room' && player.x > W-100){ world.scene='garden'; hidePrompt(); player.x=80; player.y=H-140; }
 
-        if(world.scene === "garden" && aabb(player, letter)) {
-            if(keys.e && !letter.opened) {
-                alert("💌 Happy Valentine’s Day, 愛你 ❤️");
-                letter.opened = true;
-            }
+        if(world.scene==='garden'){
+            const near = aabb({x:player.x,y:player.y,w:player.w,h:player.h}, {x:letter.x-8,y:letter.y-8,w:letter.w+16,h:letter.h+16});
+            if(near && !letter.opened){ showPrompt('Press E to open the envelope'); if(keys.e){ keys.e=false; letter.opened=true; showScreen('letterScreen'); } }
+            else if(!near){ hidePrompt(); }
         }
     }
 
-    function draw() {
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        if(world.scene === "room") drawRoom();
-        else drawGarden();
+    function draw(){
+        ctx.clearRect(0,0,W,H);
+        if(world.scene==='room') drawRoom(); else drawGarden();
         drawPlayer();
         requestAnimationFrame(loop);
     }
 
-    function loop(){ update(); draw(); }
+    function loop(){ if(!world.running) return; update(); draw(); }
 
-    document.addEventListener("keydown", e => { if(e.key in keys) keys[e.key] = true; });
-    document.addEventListener("keyup", e => { if(e.key in keys) keys[e.key] = false; });
+    // Overlay helpers
+    function showScreen(id){ document.getElementById(id).style.display='flex'; world.running=false; }
+    function hideScreen(id){ document.getElementById(id).style.display='none'; world.running=true; requestAnimationFrame(loop); }
 
-    loadAssets();
+    // Input
+    addEventListener('keydown', e=>{ if(e.key in keys) keys[e.key]=true; if(e.key==='e'||e.key==='E') keys.e=true; });
+    addEventListener('keyup',   e=>{ if(e.key in keys) keys[e.key]=false; if(e.key==='e'||e.key==='E') keys.e=false; });
+
+    // Start & modal wiring
+    document.getElementById('btnStart').addEventListener('click', ()=> hideScreen('start'));
+    document.getElementById('btnHow').addEventListener('click', ()=> showScreen('how'));
+    document.getElementById('btnCloseHow').addEventListener('click', ()=> hideScreen('how'));
+    document.getElementById('btnCloseLetter').addEventListener('click', ()=> hideScreen('letterScreen'));
+
+    // Boot
+    loadAssets().then(()=>{ /* show start by default */ });
 </script>
 </body>
 </html>
