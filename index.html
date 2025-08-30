@@ -3,375 +3,136 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Happy Valentine's Day 💖</title>
+    <title>Valentine's Day Scene</title>
     <style>
-        html, body { height: 100%; margin: 0; background: #ffe6f1; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
-        #gameWrap { display: grid; place-items: center; height: 100%; }
-        canvas { image-rendering: pixelated; image-rendering: crisp-edges; box-shadow: 0 32px 100px rgba(0,0,0,.28); border-radius: 24px; background: #fff7fb; }
-        .hud { position: fixed; inset: 0 auto auto 0; padding: .6rem .8rem; color:#7b0f3d; font-weight:700; text-shadow:0 1px 0 #fff; letter-spacing:.2px }
-        .prompt { position: fixed; left:50%; transform: translateX(-50%); bottom: 24px; background:#fff; color:#7b0f3d; border-radius: 999px; padding: 10px 16px; box-shadow: 0 16px 40px rgba(0,0,0,.20); font-weight:800; letter-spacing:.2px }
-        .credits { position: fixed; right: 12px; bottom: 8px; font-size: 12px; color:#7b0f3d; opacity: .8; }
-        .btn { background:#ff4d8d; color:#fff; border:0; border-radius:14px; padding:10px 14px; font-weight:800; box-shadow:0 12px 30px rgba(255, 77, 141, .55); cursor:pointer }
-        .btn:hover { filter: brightness(1.06) }
-        #startScreen { position: fixed; inset: 0; display:grid; place-items:center; background: radial-gradient(1200px 800px at 50% 30%, #fff7fb 0, #ffd8e8 55%, #ffc0d9 100%); }
-        .panel { background:#fff; padding:24px 22px; border-radius:18px; box-shadow:0 28px 90px rgba(0,0,0,.18); text-align:center; max-width: 760px; }
-        h1 { margin:0 0 .25rem; font-size: 30px; color:#c2175a; letter-spacing:.3px }
-        p { margin:.35rem 0; color:#6b0832 }
-        .field { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; margin-top:8px }
-        input[type="url"] { width: 520px; max-width: 80vw; padding:10px 12px; border-radius:12px; border:2px solid #ffb3cc; outline:none }
-        input[type="url"]:focus { border-color:#ff4d8d }
-        .mini { font-size:12px; color:#8a1c4a; }
-        .modal { position: fixed; inset:0; display:none; align-items:center; justify-content:center; background: rgba(255, 216, 232, .35); backdrop-filter: blur(2px); }
-        .card { background:#fff; border-radius:20px; padding:20px 22px 24px; box-shadow:0 32px 110px rgba(0,0,0,.22); width: min(680px, 92vw); text-align:center; border:3px solid #ff8fb6; position:relative; overflow:hidden; }
-        .card h2 { margin:6px 0 2px; color:#c2175a; font-size:30px }
-        .card p { color:#6b0832; margin:8px 0 0; font-size:18px }
-        #diag { position: fixed; right: 12px; bottom: 12px; background:#fff; padding:8px 10px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.18); color:#8a1c4a; font-size:12px; max-width: 340px }
-        #diag code { color:#c2175a }
+        body, html {
+            margin: 0;
+            padding: 0;
+            background: #ffe6f1;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        canvas {
+            image-rendering: pixelated;
+            border: 4px solid #ff8fb6;
+            border-radius: 12px;
+            background: #fff7fb;
+            box-shadow: 0 16px 60px rgba(0,0,0,.3);
+        }
     </style>
 </head>
 <body>
-<div id="gameWrap">
-    <canvas id="game" width="960" height="540" aria-label="Valentine's Day Game"></canvas>
-</div>
-<div class="hud">Move: ⬅️⬆️⬇️➡️ • Interact: <b>E</b> • Sprite size tweak: <b>[</b>/<b>]</b> width, <b>;</b>/<b>'</b> height</div>
-<div id="prompt" class="prompt" style="display:none"></div>
-<div id="startScreen">
-    <div class="panel">
-        <h1>For You, On Valentine’s Day 💘</h1>
-        <p>Start in your cozy room. Find the door, step into the garden, and open the <b>envelope</b> with <b>E</b>.</p>
-        <p class="mini">We’ll auto-download & cache the schoolgirl sprite you sent. If it fails, paste a direct PNG URL or upload the PNG.</p>
-        <div class="field">
-            <input id="spriteUrl" type="url" placeholder="Optional: paste direct PNG URL for the schoolgirl sprite sheet" />
-            <button class="btn" id="loadSpriteBtn">Save URL to Cache</button>
-            <input id="spriteFile" type="file" accept="image/png,image/*" style="display:none" />
-            <button class="btn" id="uploadBtn">Upload PNG</button>
-        </div>
-        <p style="margin-top:12px"><button class="btn" id="startBtn">Start</button></p>
-    </div>
-</div>
-<div class="credits">Room & garden are drawn in-code. Player sprite is cached for offline use if available.</div>
-<div id="diag" hidden>diag</div>
-
-<!-- Interactive Love Note Modal -->
-<div id="loveModal" class="modal">
-    <div class="card">
-        <h2>Happy Valentine’s Day, 愛你 ❤️</h2>
-        <p>You are my favorite adventure. Let’s keep exploring together.</p>
-        <p style="margin-top:12px"><button class="btn" id="closeModal">Close</button></p>
-    </div>
-</div>
+<canvas id="game" width="960" height="540"></canvas>
 
 <script>
-    /***************************
-     * Asset manager with Cache Storage + object URLs
-     ***************************/
-    const CACHE_NAME = 'valentine-assets-v2';
-    const SPRITE_CACHE_KEY = 'player-sprite.png';
-    const SPRITE_CANDIDATES = [
-        // If you know a direct PNG URL from the itch pack, add it here. We'll try cache->candidates->user input.
-    ];
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
 
-    async function getCache(){ return ('caches' in window) ? await caches.open(CACHE_NAME) : null; }
+    const assets = {
+        room: "https://raw.githubusercontent.com/EXIBIST32132/ValentinesDay/main/IMG/Room.png",
+        garden: "https://raw.githubusercontent.com/EXIBIST32132/ValentinesDay/main/IMG/Garden.png",
+        girl: "https://raw.githubusercontent.com/EXIBIST32132/ValentinesDay/main/IMG/Girl.png"
+    };
 
-    async function cacheSpriteFromURL(url){
-        const cache = await getCache(); if(!cache) throw new Error('Cache API unavailable');
-        const res = await fetch(url, { mode:'cors', credentials:'omit' });
-        if(!res.ok) throw new Error('HTTP '+res.status);
-        const ct = res.headers.get('content-type')||'';
-        if(!ct.includes('image')) throw new Error('URL is not an image (content-type: '+ct+')');
-        await cache.put(SPRITE_CACHE_KEY, res.clone());
-        return res;
-    }
+    const images = {};
+    let world = { scene: "room" };
 
-    async function cacheSpriteFromFile(file){
-        const cache = await getCache(); if(!cache) throw new Error('Cache API unavailable');
-        const res = new Response(file, { headers: { 'Content-Type': file.type || 'image/png' } });
-        await cache.put(SPRITE_CACHE_KEY, res.clone());
-        return res;
-    }
-
-    async function getSpriteResponse(){
-        const cache = await getCache();
-        if(cache){
-            const hit = await cache.match(SPRITE_CACHE_KEY); if(hit) return hit;
-        }
-        for(const url of SPRITE_CANDIDATES){
-            try { const r = await cacheSpriteFromURL(url); return r; } catch(e){ /* skip */ }
-        }
-        return null;
-    }
-
-    async function responseToImage(res){
-        if(!res) return null;
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        return await loadImage(url);
-    }
-
-    function loadImage(url){
-        return new Promise((resolve,reject)=>{
+    function loadImage(name, url) {
+        return new Promise((resolve, reject) => {
             const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => resolve(img);
-            img.onerror = () => reject(new Error('Image load failed'));
+            img.onload = () => { images[name] = img; resolve(); };
+            img.onerror = reject;
             img.src = url;
         });
     }
 
-    /***************************
-     * Game state & helpers
-     ***************************/
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const W = canvas.width, H = canvas.height;
-    const promptEl = document.getElementById('prompt');
-    const diagEl = document.getElementById('diag');
-
-    const world = { scene: 'room' };
-    const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, e:false };
-
-    const player = {
-        x: 180, y: 320, w: 48, h: 54, speed: 2.1,
-        dir: 'down', moving:false,
-        sheet: null,
-        frameW: 48, frameH: 48,
-        frame: 0, tick: 0,
-        rows: 4, cols: 4,
-        rowMap: { down:0, left:1, right:2, up:3 }, // can be auto-detected/tuned
-    };
-
-    const hearts = [];
-    const flowers = [];
-    const letter = { x: W/2 - 28, y: H*0.52 - 16, w: 56, h: 32, opened:false, visible:false };
-
-    function showPrompt(text){ promptEl.textContent = text; promptEl.style.display = 'block'; }
-    function hidePrompt(){ promptEl.style.display = 'none'; }
-    function aabb(a,b){ return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y; }
-
-    /***************************
-     * Pretty room & garden (procedural)
-     ***************************/
-    function drawRoom(){
-        const wall = ctx.createLinearGradient(0,0,0,H-160); wall.addColorStop(0,'#fff3f9'); wall.addColorStop(1,'#ffd9e9');
-        ctx.fillStyle = wall; ctx.fillRect(0,0,W,H-160);
-        ctx.fillStyle = '#f3d9b0'; ctx.fillRect(0,H-160,W,160);
-        ctx.strokeStyle = 'rgba(139,94,60,.35)'; ctx.lineWidth = 2; for(let x=0;x<W;x+=28){ ctx.beginPath(); ctx.moveTo(x,H-160); ctx.lineTo(x,H); ctx.stroke(); }
-
-        // rug
-        ctx.fillStyle = '#ffeef6'; ctx.fillRect(W*0.32, H-130, 220, 90); ctx.strokeStyle = '#ffb7cf'; ctx.strokeRect(W*0.32+0.5, H-129.5, 220, 90);
-
-        // sofa + cushions
-        ctx.fillStyle = '#ffc4da'; ctx.fillRect(W*0.12, H-120, 200, 66);
-        ctx.fillStyle = '#ffb3c7'; ctx.fillRect(W*0.12+18, H-132, 50, 20); ctx.fillRect(W*0.12+78, H-132, 50, 20);
-
-        // second sofa
-        ctx.fillStyle = '#ffd3e1'; ctx.fillRect(W*0.60, H-120, 180, 66);
-
-        // coffee table
-        ctx.fillStyle = '#fff'; ctx.fillRect(W*0.42, H-110, 120, 44); ctx.strokeStyle = '#ff8fb6'; ctx.strokeRect(W*0.42, H-110, 120, 44);
-
-        // bookshelf
-        ctx.fillStyle = '#caa27f'; ctx.fillRect(W*0.05, H-250, 120, 100);
-        for(let i=0;i<5;i++){ ctx.fillStyle = ['#ff8fb6','#cfe8ff','#ffd15c','#a6f0aa','#f2b8ff'][i%5]; ctx.fillRect(W*0.05+10+i*20, H-240, 14, 80); }
-
-        // plants by window
-        ctx.fillStyle = '#cfe8ff'; ctx.fillRect(W*0.40, 40, 120, 80);
-        for(let i=0;i<3;i++){ const px=W*0.40+10+i*36, py=140+(i%2)*4; ctx.fillStyle='#b5794a'; ctx.fillRect(px, py, 18, 8); ctx.fillStyle='#31a24c'; ctx.beginPath(); ctx.arc(px+9, py-6, 12, 0, Math.PI*2); ctx.fill(); ctx.fillStyle='#ff4d8d'; ctx.beginPath(); ctx.arc(px+9, py-8, 3, 0, Math.PI*2); ctx.fill(); }
-
-        // door with knob
-        ctx.fillStyle = '#c79b7b'; ctx.fillRect(W-120, H-200, 86, 186); ctx.fillStyle = '#6b4b3b'; ctx.beginPath(); ctx.arc(W-44, H-110, 6, 0, Math.PI*2); ctx.fill();
+    async function loadAssets() {
+        await Promise.all([
+            loadImage("room", assets.room),
+            loadImage("garden", assets.garden),
+            loadImage("girl", assets.girl)
+        ]);
+        draw();
     }
 
-    function drawGarden(){
-        const sky = ctx.createLinearGradient(0,0,0,H); sky.addColorStop(0,'#ffd9ea'); sky.addColorStop(1,'#fff'); ctx.fillStyle = sky; ctx.fillRect(0,0,W,H);
-        ctx.globalAlpha = .65; ctx.beginPath(); ctx.arc(140,80,48,0,Math.PI*2); ctx.fillStyle = '#fff3b5'; ctx.fill(); ctx.globalAlpha = 1;
-        ctx.fillStyle = '#f3c7da'; ctx.beginPath(); ctx.moveTo(0,160); for(let x=0;x<=W;x+=40){ ctx.lineTo(x, 160 + Math.sin(x/80)*12); } ctx.lineTo(W,0); ctx.closePath(); ctx.fill();
+    const player = { x: 200, y: 350, w: 64, h: 64 };
+    const keys = { ArrowUp:false, ArrowDown:false, ArrowLeft:false, ArrowRight:false, e:false };
+    const letter = { x: 460, y: 280, w: 50, h: 30, opened: false };
 
-        // lawn & path
-        ctx.fillStyle = '#cdf7ce'; ctx.fillRect(0,H*0.38,W,H*0.62);
-        ctx.fillStyle = '#ffe5b9'; ctx.beginPath(); ctx.moveTo(W*0.12, H*0.62); ctx.quadraticCurveTo(W*0.50, H*0.56, W*0.88, H*0.62); ctx.lineTo(W*0.88, H*0.62+46); ctx.quadraticCurveTo(W*0.50, H*0.56+46, W*0.12, H*0.62+46); ctx.closePath(); ctx.fill();
+    function drawRoom() {
+        ctx.drawImage(images.room, 0, 0, canvas.width, canvas.height);
+    }
 
-        // picket fence
-        ctx.fillStyle = '#fff'; for(let x=16;x<W-16;x+=22){ ctx.fillRect(x,H-86,10,66); } ctx.fillRect(16,H-26,W-32,10);
+    function drawGarden() {
+        ctx.drawImage(images.garden, 0, 0, canvas.width, canvas.height);
+        drawEnvelope(letter.x, letter.y, letter.w, letter.h);
+    }
 
-        // bench & tree
-        ctx.fillStyle = '#8b5a2b'; ctx.fillRect(100,H*0.38-20,30,120);
-        ctx.fillStyle = '#2e8b57'; ctx.beginPath(); ctx.arc(115,H*0.38-40,60,0,Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#d0a07c'; ctx.fillRect(200, H*0.62-14, 120, 14); ctx.fillRect(210, H*0.62, 12, 24); ctx.fillRect(298, H*0.62, 12, 24);
+    function drawPlayer() {
+        ctx.drawImage(images.girl, player.x, player.y, player.w, player.h);
+    }
 
-        // flowers (stable positions — no flicker)
-        for(const f of flowers){
-            const sway = Math.sin(f.phase)*1.2; // gentle, deterministic
-            ctx.fillStyle = '#ff4d8d'; ctx.beginPath(); ctx.arc(f.x + sway, f.y, f.r, 0, Math.PI*2); ctx.fill();
-            ctx.fillStyle = '#31a24c'; ctx.fillRect(f.x-1 + sway, f.y+f.r-1, 2, 10);
-            f.phase += 0.01 + f.speed; // smooth update
+    function drawEnvelope(x,y,w,h) {
+        ctx.save();
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(x,y,w,h);
+        ctx.strokeStyle = "#ff8fb6";
+        ctx.strokeRect(x,y,w,h);
+        ctx.beginPath();
+        ctx.moveTo(x,y);
+        ctx.lineTo(x+w/2,y+h/2);
+        ctx.lineTo(x+w,y);
+        ctx.stroke();
+        ctx.fillStyle = "#ff4d8d";
+        ctx.beginPath();
+        ctx.moveTo(x+w/2,y+h/2);
+        ctx.arc(x+w/2-4,y+h/2-4,4,0,Math.PI*2);
+        ctx.arc(x+w/2+4,y+h/2-4,4,0,Math.PI*2);
+        ctx.lineTo(x+w/2,y+h/2+6);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function aabb(a,b){
+        return a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
+    }
+
+    function update() {
+        const speed = 3;
+        if(keys.ArrowLeft) player.x -= speed;
+        if(keys.ArrowRight) player.x += speed;
+        if(keys.ArrowUp) player.y -= speed;
+        if(keys.ArrowDown) player.y += speed;
+
+        if(world.scene === "room" && player.x > 860) {
+            world.scene = "garden";
+            player.x = 100; player.y = 400;
         }
 
-        // envelope
-        letter.visible = true; drawEnvelope(letter.x,letter.y,letter.w,letter.h);
-    }
-
-    function initFlowers(){
-        flowers.length = 0;
-        for(let y=H*0.44; y<H-80; y+=36){
-            for(let x=40; x<W-40; x+=48){
-                if(Math.random() < 0.65){
-                    flowers.push({ x: x + (Math.random()*12-6), y: y + (Math.random()*8-4), r: 5+Math.random()*3, phase: Math.random()*Math.PI*2, speed: Math.random()*0.01 });
-                }
+        if(world.scene === "garden" && aabb(player, letter)) {
+            if(keys.e && !letter.opened) {
+                alert("💌 Happy Valentine’s Day, 愛你 ❤️");
+                letter.opened = true;
             }
         }
     }
 
-    function drawEnvelope(x,y,w,h){
-        ctx.save();
-        ctx.globalAlpha = .22; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(x+w/2, y+h, w/2, 6, 0, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
-        ctx.fillStyle = '#fff'; ctx.strokeStyle='#ff8fb6'; ctx.lineWidth=2; ctx.fillRect(x,y,w,h); ctx.strokeRect(x+1,y+1,w-2,h-2);
-        ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+w/2,y+h/2); ctx.lineTo(x+w,y); ctx.stroke();
-        ctx.fillStyle = '#ff4d8d'; ctx.beginPath(); ctx.moveTo(x+w/2, y+h/2); ctx.arc(x+w/2-4,y+h/2-4,4,0,Math.PI*2); ctx.arc(x+w/2+4,y+h/2-4,4,0,Math.PI*2); ctx.lineTo(x+w/2,y+h/2+6); ctx.fill();
-        ctx.restore();
+    function draw() {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        if(world.scene === "room") drawRoom();
+        else drawGarden();
+        drawPlayer();
+        requestAnimationFrame(loop);
     }
 
-    /***************************
-     * Hearts
-     ***************************/
-    function spawnHeart(x,y){ hearts.push({ x, y, vy: -(0.6+Math.random()*1.0), life: 220 + Math.random()*120, r: 6 + Math.random()*10, wob: Math.random()*Math.PI }); }
-    function updateHearts(){ for(const h of hearts){ h.y += h.vy; h.x += Math.sin((h.wob+=0.03))*0.3; h.life -= 1; } for(let i=hearts.length-1;i>=0;i--) if(hearts[i].life<=0) hearts.splice(i,1); }
-    function drawHearts(){ for(const h of hearts){ ctx.save(); ctx.translate(h.x,h.y); ctx.fillStyle = 'rgba(255,77,141,0.85)'; ctx.beginPath(); ctx.moveTo(0,0); ctx.bezierCurveTo(-h.r, -h.r, -h.r, h.r, 0, h.r*1.2); ctx.bezierCurveTo(h.r, h.r, h.r, -h.r, 0,0); ctx.fill(); ctx.restore(); } }
+    function loop(){ update(); draw(); }
 
-    /***************************
-     * Player sprite: auto-detect frame grid
-     ***************************/
-    function autoDetectFrames(img){
-        // Many packs use 4 rows for directions. Try to detect smartly.
-        const possibleRows = [4, 3, 5, 6, 8];
-        let chosenRows = 4; // preference
-        for(const r of possibleRows){ if(img.height % r === 0) { chosenRows = r; break; } }
-        const frameH = Math.floor(img.height / chosenRows);
+    document.addEventListener("keydown", e => { if(e.key in keys) keys[e.key] = true; });
+    document.addEventListener("keyup", e => { if(e.key in keys) keys[e.key] = false; });
 
-        // Try common widths and divisors
-        const candidates = [48, 64, 32, 40, 56, 72];
-        let frameW = null; let cols = null;
-        for(const c of candidates){ if(img.width % c === 0){ frameW = c; cols = img.width / c; break; } }
-        if(!frameW){
-            // fallback to square-ish frames
-            frameW = frameH; cols = Math.floor(img.width / frameW);
-        }
-
-        // Direction row order guess: down,left,right,up (common). If not, user can tweak later.
-        const rowMap = { down:0, left:1, right:2, up:3 };
-
-        return { frameW, frameH, rows: chosenRows, cols, rowMap };
-    }
-
-    function drawPlayer(){
-        ctx.globalAlpha = .22; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(Math.round(player.x)+player.w/2, Math.round(player.y)+player.h-8, 16, 6, 0, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
-        if(player.sheet){
-            const dirRow = player.rowMap[player.dir] ?? 0;
-            const sx = (player.frame % player.cols) * player.frameW;
-            const sy = dirRow * player.frameH;
-            try { ctx.drawImage(player.sheet, sx, sy, player.frameW, player.frameH, Math.round(player.x), Math.round(player.y) - (player.frameH-player.h), player.frameW, player.frameH); } catch(e){ /* ignore */ }
-        } else {
-            // fallback chibi
-            ctx.fillStyle = '#ffb6c1'; ctx.fillRect(player.x,player.y,player.w,player.h-10);
-            ctx.fillStyle = '#ff69b4'; ctx.fillRect(player.x,player.y+player.h-20,player.w,10);
-            ctx.fillStyle = '#ffe0bd'; ctx.fillRect(player.x+8,player.y-10,player.w-16,10);
-            ctx.fillStyle = '#000'; ctx.fillRect(player.x+6,player.y-10,player.w-12,6);
-        }
-    }
-
-    function animatePlayer(){
-        if(player.moving){ player.tick++; if(player.tick % 8 === 0) player.frame = (player.frame+1) % Math.max(1, player.cols || 4); }
-        else { player.frame = 0; player.tick = 0; }
-    }
-
-    /***************************
-     * Update / Draw / Loop
-     ***************************/
-    function update(){
-        const s = player.speed; let vx=0,vy=0; player.moving=false;
-        if(keys.ArrowLeft){vx=-s;player.dir='left';player.moving=true;}
-        if(keys.ArrowRight){vx=s;player.dir='right';player.moving=true;}
-        if(keys.ArrowUp){vy=-s;player.dir='up';player.moving=true;}
-        if(keys.ArrowDown){vy=s;player.dir='down';player.moving=true;}
-        player.x+=vx; player.y+=vy;
-
-        if(world.scene==='room'){
-            const doorArea={x:W-120,y:H-200,w:86,h:186};
-            if(aabb({x:player.x,y:player.y,w:player.w,h:player.h},doorArea)){ showPrompt('Press E to go outside'); if(keys.e){ keys.e=false; world.scene='garden'; hidePrompt(); initFlowers(); for(let i=0;i<100;i++) spawnHeart(W/2,H*0.5); } } else hidePrompt();
-        }
-        if(world.scene==='garden'){
-            const nearLetter=aabb({x:player.x,y:player.y,w:player.w,h:player.h},{x:letter.x-8,y:letter.y-8,w:letter.w+16,h:letter.h+16});
-            if(nearLetter && !letter.opened){ showPrompt('Press E to open the envelope'); if(keys.e){ keys.e=false; openLoveMessage(); } }
-            else if(!nearLetter){ hidePrompt(); }
-        }
-
-        animatePlayer();
-        updateHearts();
-    }
-
-    function draw(){ ctx.clearRect(0,0,W,H); if(world.scene==='room') drawRoom(); else drawGarden(); drawPlayer(); drawHearts(); }
-    function loop(){ update(); draw(); requestAnimationFrame(loop); }
-
-    function openLoveMessage(){
-        letter.opened=true; document.getElementById('loveModal').style.display='flex'; for(let i=0;i<220;i++) spawnHeart(letter.x+letter.w/2,letter.y);
-    }
-
-    /***************************
-     * Controls & UI
-     ***************************/
-    addEventListener('keydown', e=>{
-        if(e.key in keys){ keys[e.key]=true; }
-        if(e.key==='e'||e.key==='E'){ keys.e=true; }
-        if(e.key==='['){ player.frameW = Math.max(24, player.frameW-2); }
-        if(e.key===']'){ player.frameW = Math.min(256, player.frameW+2); }
-        if(e.key===';'){ player.frameH = Math.max(24, player.frameH-2); }
-        if(e.key==="'"){ player.frameH = Math.min(256, player.frameH+2); }
-    });
-    addEventListener('keyup', e=>{ if(e.key in keys){ keys[e.key]=false; } if(e.key==='e'||e.key==='E'){ keys.e=false; } });
-
-    document.getElementById('closeModal').addEventListener('click',()=>{ document.getElementById('loveModal').style.display='none'; });
-
-    /***************************
-     * Boot + sprite caching hooks
-     ***************************/
-    const startBtn = document.getElementById('startBtn');
-    const loadBtn = document.getElementById('loadSpriteBtn');
-    const uploadBtn = document.getElementById('uploadBtn');
-    const spriteUrlInput = document.getElementById('spriteUrl');
-    const spriteFileInput = document.getElementById('spriteFile');
-
-    async function tryLoadSpriteFromCache(){
-        try {
-            const res = await getSpriteResponse();
-            if(!res) { diag('No cached sprite yet. Paste a direct PNG URL or use Upload PNG.'); return; }
-            const img = await responseToImage(res);
-            const meta = autoDetectFrames(img);
-            Object.assign(player, { sheet: img, frameW: meta.frameW, frameH: meta.frameH, rows: meta.rows, cols: meta.cols, rowMap: meta.rowMap, h: meta.frameH, w: meta.frameW });
-            diag(`Loaded sprite ${img.width}×${img.height}. Detected ${meta.cols}×${meta.rows} grid at ${meta.frameW}×${meta.frameH}.`);
-        } catch(e){ diag('Sprite load failed: '+e.message); }
-    }
-
-    function diag(msg){ diagEl.hidden=false; diagEl.innerHTML = `<b>Info:</b> ${msg}<br><small>Use [ ] ; ' if a different frame size looks better.</small>`; }
-
-    loadBtn.addEventListener('click', async ()=>{
-        const url = spriteUrlInput.value.trim(); if(!url) { diag('Please paste a direct PNG URL to cache.'); return; }
-        try { await cacheSpriteFromURL(url); diag('Saved sprite to cache. Click Start!'); }
-        catch(e){ diag('Failed to save: '+e.message); }
-    });
-
-    uploadBtn.addEventListener('click', ()=> spriteFileInput.click());
-    spriteFileInput.addEventListener('change', async (e)=>{
-        const file = e.target.files && e.target.files[0]; if(!file) return;
-        try { await cacheSpriteFromFile(file); diag('Saved uploaded sprite to cache. Click Start!'); }
-        catch(e){ diag('Failed to cache upload: '+e.message); }
-    });
-
-    startBtn.addEventListener('click', async ()=>{
-        document.getElementById('startScreen').style.display='none';
-        await tryLoadSpriteFromCache();
-        initFlowers();
-        loop();
-    });
+    loadAssets();
 </script>
 </body>
 </html>
